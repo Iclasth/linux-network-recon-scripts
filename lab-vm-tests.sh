@@ -1,64 +1,64 @@
 #!/bin/sh
 
-# Comandos que alteram temporariamente a pilha de rede.
-# Rode em VM ou ambiente isolado para não derrubar sua conexao.
+# Script de laboratorio (alteracao temporaria de estado na pilha de rede).
+# Execute apenas em VM ou ambiente isolado.
 
-# --- Endereco IP (add -> show -> del) ---
-ip addr add 192.168.50.5/24 dev eth1
-# Adiciona um IP na interface eth1 ("addr" e "dev" sao nomes completos/padrao).
+REPORT_DIR="reports"
+mkdir -p "$REPORT_DIR"
 
-ip addr show dev eth1
-# Mostra o IP aplicado na interface.
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+OUT_FILE="$REPORT_DIR/lab-vm-tests-${TIMESTAMP}.txt"
 
-ip addr del 192.168.50.5/24 dev eth1
-# Remove o IP adicionado acima.
+{
+  echo "=========================================="
+  echo "RELATORIO DE LABORATORIO DE REDE (VM)"
+  echo "Data/Hora: $(date)"
+  echo "Host: $(hostname)"
+  echo "=========================================="
+  echo ""
+} > "$OUT_FILE"
 
-# --- Estado da interface (up -> show -> down) ---
-ip link set eth1 up
-# Ativa a interface eth1.
+# Executa um comando e registra no arquivo .txt
+log_cmd() {
+  DESC="$1"
+  CMD="$2"
 
-ip link show dev eth1
-# Exibe o estado atual e o MAC da interface.
+  {
+    echo ">>> $DESC"
+    echo "$ $CMD"
+    sh -c "$CMD" 2>&1
+    echo ""
+  } >> "$OUT_FILE"
+}
 
-ip link set eth1 down
-# Desativa a interface eth1.
+# --- 1. Endereco IP (add -> show -> del) ---
+log_cmd "Adicionando IP secundario de teste" "ip addr add 192.168.50.5/24 dev eth1"
+log_cmd "Conferindo IP aplicado" "ip addr show dev eth1"
+log_cmd "Removendo IP secundario de teste" "ip addr del 192.168.50.5/24 dev eth1"
 
-# --- Rota estatica (add -> show -> del) ---
-ip route add 10.10.20.0/24 via 172.19.1.10 dev eth1
-# Adiciona rota para a rede 10.10.20.0/24 via gateway 172.19.1.10.
+# --- 2. Estado da interface (up -> show -> down) ---
+log_cmd "Habilitando interface eth1" "ip link set eth1 up"
+log_cmd "Conferindo estado da interface" "ip link show dev eth1"
+log_cmd "Desabilitando interface eth1" "ip link set eth1 down"
 
-ip route show
-# Exibe a tabela de rotas atualizada.
+# --- 3. Rota estatica (add -> show -> del) ---
+log_cmd "Adicionando rota estatica" "ip route add 10.10.20.0/24 via 172.19.1.10 dev eth1"
+log_cmd "Conferindo tabela de rotas" "ip route show"
+log_cmd "Removendo rota estatica" "ip route del 10.10.20.0/24 via 172.19.1.10 dev eth1"
 
-ip route del 10.10.20.0/24 via 172.19.1.10 dev eth1
-# Remove a rota estatica adicionada.
+# --- 4. Rota padrao / gateway (add -> show -> del) ---
+log_cmd "Adicionando rota padrao temporaria" "ip route add default via 192.168.50.100"
+log_cmd "Conferindo rota padrao" "ip route show default"
+log_cmd "Removendo rota padrao temporaria" "ip route del default via 192.168.50.100"
 
-# --- Rota padrao / gateway (add -> show -> del) ---
-ip route add default via 192.168.50.100
-# Define uma rota padrao (gateway) temporaria.
+# --- 5. Tabela ARP / vizinhos (add -> show -> del) ---
+log_cmd "Adicionando entrada ARP estatica" "ip neigh add 192.168.1.80 lladdr 02:11:22:33:44:66 dev wlo1 nud permanent"
+log_cmd "Conferindo tabela ARP" "ip neigh show dev wlo1"
+log_cmd "Removendo entrada ARP de teste" "ip neigh del 192.168.1.80 dev wlo1"
 
-ip route show default
-# Mostra a rota padrao ativa.
+# --- 6. Cache DNS (query -> flush -> statistics) ---
+log_cmd "Consultando dominio antes da limpeza" "resolvectl query google.com"
+log_cmd "Limpando cache DNS local" "resolvectl flush-caches"
+log_cmd "Conferindo estatisticas de cache" "resolvectl statistics"
 
-ip route del default via 192.168.50.100
-# Remove a rota padrao adicionada.
-
-# --- Tabela ARP / vizinhos (add -> show -> del) ---
-ip neigh add 192.168.1.80 lladdr 02:11:22:33:44:66 dev wlo1 nud permanent
-# Registra um mapeamento IP -> MAC fixo na tabela ARP.
-
-ip neigh show dev wlo1
-# Exibe as entradas ARP da interface.
-
-ip neigh del 192.168.1.80 dev wlo1
-# Remove a entrada ARP de teste.
-
-# --- Cache DNS (query -> flush -> statistics) ---
-resolvectl query google.com
-# Faz uma consulta DNS para popular ou testar o cache.
-
-resolvectl flush-caches
-# Limpa o cache DNS local para comparar respostas antes e depois.
-
-resolvectl statistics
-# Mostra metricas de cache, consultas e respostas do DNS.
+echo "Log do laboratorio salvo em: $OUT_FILE"

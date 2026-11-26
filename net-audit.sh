@@ -1,28 +1,40 @@
 #!/bin/sh
 
-# Script de diagnostico somente-leitura (nao altera configuracoes de rede).
-# Substitui utilitarios antigos do pacote net-tools (ifconfig, route, arp, netstat).
+# Diretorio de saida para relatorios locais
+REPORT_DIR="reports"
+mkdir -p "$REPORT_DIR"
 
-# --- Interfaces, IPs, rotas e tabela ARP ---
-ip -br addr
-# Lista interfaces, estado e enderecos IP/MAC de forma resumida.
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+OUT_FILE="$REPORT_DIR/net-audit-${TIMESTAMP}.txt"
 
-ip link show
-# Exibe detalhes da camada de enlace: estado (UP/DOWN), MAC e broadcast.
+# Cabecalho inicial do relatorio (sobrescreve se o arquivo ja existir)
+{
+  echo "=========================================="
+  echo "RELATORIO DE AUDITORIA DE REDE (SOMENTE LEITURA)"
+  echo "Data/Hora: $(date)"
+  echo "Host: $(hostname)"
+  echo "=========================================="
+  echo ""
+} > "$OUT_FILE"
 
-ip route show
-# Mostra a tabela de rotas, sub-redes locais e o gateway padrao (substitui "route").
+# Funcao auxiliar para registrar cada comando e sua saida
+run_section() {
+  TITLE="$1"
+  CMD="$2"
 
-ip neigh show
-# Exibe a tabela ARP/vizinhos (mapeamento IP -> MAC na rede local; substitui "arp").
+  {
+    echo "--- $TITLE ($CMD) ---"
+    sh -c "$CMD" 2>&1
+    echo ""
+  } >> "$OUT_FILE"
+}
 
-# --- Resolucao de nomes (DNS) ---
-resolvectl status
-# Mostra servidores DNS ativos, protocolos e dominios configurados por interface.
+run_section "Interfaces e IPs" "ip -br addr"
+run_section "Camada de Enlace" "ip link show"
+run_section "Rotas e Gateway" "ip route show"
+run_section "Tabela ARP/Vizinhos" "ip neigh show"
+run_section "Status DNS" "resolvectl status"
+run_section "Consulta DNS" "resolvectl query google.com"
+run_section "Portas e Sockets" "ss -tulnp"
 
-resolvectl query google.com
-# Testa a resolucao DNS de um dominio e mostra o IP retornado.
-
-# --- Sockets e portas em escuta ---
-ss -tulnp
-# Lista sockets TCP/UDP em escuta e processos associados para auditar portas abertas (substitui "netstat").
+echo "Relatorio salvo em: $OUT_FILE"
