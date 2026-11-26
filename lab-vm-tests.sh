@@ -1,32 +1,64 @@
 #!/bin/sh
 
-# Esse arquivo contém comandos que alteram diretamente informações e configurações temporárias acerca da pilha de rede.
-# Se não deseja ter problemas de conexão enquanto executa os comandos, utilize uma VM (máquina virtual) para testes.
+# Comandos que alteram temporariamente a pilha de rede.
+# Rode em VM ou ambiente isolado para não derrubar sua conexao.
 
-ip a add 192.168.50.5 dev eth1
-# Adiciona um endereço de IP a uma interface de rede específica (host/eth1)
-# "a" é a abreviação de "addr(address)" e "dev" é a abreviação de "device"
+# --- Endereco IP (add -> show -> del) ---
+ip addr add 192.168.50.5/24 dev eth1
+# Adiciona um IP na interface eth1 ("addr" e "dev" sao nomes completos/padrao).
 
-ip a del 192.168.50.5 dev eth1
-# Remove o endereço de IP atribuido acima (host/eth1)
+ip addr show dev eth1
+# Mostra o IP aplicado na interface.
 
+ip addr del 192.168.50.5/24 dev eth1
+# Remove o IP adicionado acima.
+
+# --- Estado da interface (up -> show -> down) ---
 ip link set eth1 up
-# Responsável por habilitar a interface de rede (host/eth1)
+# Ativa a interface eth1.
+
+ip link show dev eth1
+# Exibe o estado atual e o MAC da interface.
 
 ip link set eth1 down
-# Responsável por desabilitar a interface de rede (host/eth1)
+# Desativa a interface eth1.
 
+# --- Rota estatica (add -> show -> del) ---
 ip route add 10.10.20.0/24 via 172.19.1.10 dev eth1
-# Utilizado para modificar a rota de rede padrão, incluindo o gateway utilizado
+# Adiciona rota para a rede 10.10.20.0/24 via gateway 172.19.1.10.
 
-ip route del 10.10.20.0/24
-# Segue a mesma linha de raciocício do comando anterior, mas diferentemente, ele remove uma rota
+ip route show
+# Exibe a tabela de rotas atualizada.
 
+ip route del 10.10.20.0/24 via 172.19.1.10 dev eth1
+# Remove a rota estatica adicionada.
+
+# --- Rota padrao / gateway (add -> show -> del) ---
 ip route add default via 192.168.50.100
-# Adiciona uma nova rota padrão a tabela de rotas
+# Define uma rota padrao (gateway) temporaria.
+
+ip route show default
+# Mostra a rota padrao ativa.
+
+ip route del default via 192.168.50.100
+# Remove a rota padrao adicionada.
+
+# --- Tabela ARP / vizinhos (add -> show -> del) ---
+ip neigh add 192.168.1.80 lladdr 02:11:22:33:44:66 dev wlo1 nud permanent
+# Registra um mapeamento IP -> MAC fixo na tabela ARP.
+
+ip neigh show dev wlo1
+# Exibe as entradas ARP da interface.
+
+ip neigh del 192.168.1.80 dev wlo1
+# Remove a entrada ARP de teste.
+
+# --- Cache DNS (query -> flush -> statistics) ---
+resolvectl query google.com
+# Faz uma consulta DNS para popular ou testar o cache.
 
 resolvectl flush-caches
-# Limpa o cache de DNS do sistema operacional. Ùtil para ver a diferença no tempo de resposta de uma requisição DNS, antes e depois da limpeza.
+# Limpa o cache DNS local para comparar respostas antes e depois.
 
-resolvectl statistics 
-# Exibe as estatísticas referente a cache do sistema DNS, incluindo o número de consultas, respostas e falhas.
+resolvectl statistics
+# Mostra metricas de cache, consultas e respostas do DNS.
